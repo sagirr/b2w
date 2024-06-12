@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <link rel="icon" sizes="16x16" type="image/png" href="/img/icon/logo-16x16.png" />
+    <link rel="icon" sizes="32x32" type="image/png" href="/img/icon/logo-32x32.png" />
+    <link rel="icon" sizes="96x96" type="image/png" href="/img/icon/logo-96x96.png" />
+    <title>enable3d • 3D for Web, Mobile and PC</title>
+    <meta
+      name="description"
+      content="Cross-Platform 3D Game Framework using HTML5 and WebGL wrapping Three.js and ammo.js (bullet3). Includes Headless Physics mode for your Node.js Server and a Phaser 3D Extension."
+    />
+    <link rel="stylesheet" href="./enabled/css/style.css?ver=1.2.3" />
+  </head>
+
+  <body>
+   
+
+     <div id="welcome-game">
+      <div id="welcome-game-placeholder">
+        <div id="welcome-game-placeholder-loader"><div class="loader"></div></div>
+        <div id="welcome-game-placeholder-image"></div>
+      </div>
+    </div>
+	<div style="position:absolute;z-index:999;left:0;top:10px">
+<a href="index.html">viewer</a>
+</div>
+    <script>
+      const WIDTH = window.innerWidth
+      const HEIGHT = !('ontouchstart' in window) ? (window.innerHeight )  : window.innerHeight 
+      document.getElementById('welcome-game').style.height = `${HEIGHT}px`
+    </script>
+ <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <script src="./enabled/js/load-images.js?ver=2.0.0"></script>
+    <script src="./enabled/lib/enable3d/enable3d.framework.0.25.4.min.js"></script>
+	<script src="./enabled.js"></script>
+    <script>
+	
+	const {
+  Project,
+  PhysicsLoader,
+  Scene3D,
+  ExtendedObject3D,
+  THREE,
+  JoyStick,
+  ThirdPersonControls,
+  PointerLock,
+  PointerDrag
+} = ENABLE3D
+
+/**
+ * Is touch device?
+ */
+const isTouchDevice = 'ontouchstart' in window
+
+class MainScene extends Scene3D {
+  constructor() {
+    super('MainScene')
+  }
+
+  init() {
+    this.renderer.setPixelRatio(Math.max(1, window.devicePixelRatio / 2))
+
+    this.canJump = true
+    this.move = false
+
+    this.moveTop = 0
+    this.moveRight = 0
+  }
+
+ async preload() {
+ 
+		 const modelsToLoad = models;
+
+		const manModelToLoad = [
+		  { path: './enabled/assets/glb/box_man.glb', name: 'man' },
+		];
+
+		const preloadPromises = [
+		  ...modelsToLoad.map(async (modelInfo) => {
+			const loadedModel = await this.load.preload(modelInfo.name, modelInfo.path);
+			return { name: modelInfo.name, loadedModel };
+		  }),
+		  ...manModelToLoad.map(async (modelInfo) => {
+			const loadedModel = await this.load.preload(modelInfo.name, modelInfo.path);
+			return { name: modelInfo.name, loadedModel };
+		  }),
+		];
+
+		await Promise.all(preloadPromises);
+
+	
+	
+	
+  }
+
+
+  async create() {
+  
+    const { lights } = await this.warpSpeed('sky','-ground', '-orbitControls')
+
+    const { hemisphereLight, ambientLight, directionalLight } = lights
+    const intensity = 1
+    hemisphereLight.intensity = intensity
+    ambientLight.intensity = intensity
+    directionalLight.intensity = intensity
+
+    // this.physics.debug.enable()
+
+    const addModel = async (modelName, position) => {
+      const object = await this.load.gltf(modelName);
+      const model = new ExtendedObject3D();
+	   model.position.set(position.x,position.y,position.z);
+	  
+      model.name = modelName;
+      model.add(object.scenes[0]);
+      this.add.existing(model);
+
+      // Diğer işlemleri buraya ekleyebilirsiniz
+
+      model.traverse(child => {
+        if (child.isMesh) {
+          child.castShadow = child.receiveShadow = false;
+          child.material.metalness = 0;
+          child.material.roughness = 1;
+
+		  
+            this.physics.add.existing(child, {
+			
+              shape: 'concave',
+              mass: 1,
+              collisionFlags: 1,
+              autoCenter: false
+            });
+			console.log(child)
+
+            child.body.setAngularFactor(0, 0, 0);
+            child.body.setLinearFactor(0, 0, 0);
+         
+        }
+      });
+
+      
+
+      // Modellerin başlangıç pozisyonlarını ayarlayabilirsiniz
+     
+	  
+	  
+	  
+    };
+
+const modelsToLoad = models;
+
+  // Modelleri döngü içinde yükle ve ekleyerek diziye ekle
+  for (const modelInfo of modelsToLoad) {
+  
+    await addModel(modelInfo.name, modelInfo.position);
+  }
+
+	
+    const addMan = async () => {
+      const object = await this.load.gltf('man')
+      const man = object.scene.children[0]
+
+      this.man = new ExtendedObject3D()
+      this.man.name = 'man'
+      this.man.rotateY(Math.PI + 0.1) // a hack
+      this.man.add(man)
+      this.man.rotation.set(0, Math.PI * 1.5, 0)
+      this.man.position.set(35, 0, 0)
+      // add shadow
+      this.man.traverse(child => {
+        if (child.isMesh) {
+          child.castShadow = child.receiveShadow = false
+          // https://discourse.threejs.org/t/cant-export-material-from-blender-gltf/12258
+          child.material.roughness = 1
+          child.material.metalness = 0
+        }
+      })
+
+      /**
+       * Animations
+       */
+      // ad the box man's animation mixer to the animationMixers array (for auto updates)
+      this.animationMixers.add(this.man.animation.mixer)
+
+      object.animations.forEach(animation => {
+        if (animation.name) {
+          this.man.animation.add(animation.name, animation)
+        }
+      })
+      this.man.animation.play('idle')
+
+      /**
+       * Add the player to the scene with a body
+       */
+      this.add.existing(this.man)
+      this.physics.add.existing(this.man, {
+        shape: 'sphere',
+        radius: 0.25,
+        width: 0.5,
+        offset: { y: -0.25 }
+      })
+      this.man.body.setFriction(0.8)
+      this.man.body.setAngularFactor(0, 0, 0)
+
+      // https://docs.panda3d.org/1.10/python/programming/physics/bullet/ccd
+      this.man.body.setCcdMotionThreshold(1e-7)
+      this.man.body.setCcdSweptSphereRadius(0.25)
+
+      /**
+       * Add 3rd Person Controls
+       */
+      this.controls = new ThirdPersonControls(this.camera, this.man, {
+        offset: new THREE.Vector3(0, 1, 0),
+        targetRadius: 3
+      })
+      // set initial view to 90 deg theta
+      this.controls.theta = 90
+
+      /**
+       * Add Pointer Lock and Pointer Drag
+       */
+      if (!isTouchDevice) {
+        let pl = new PointerLock(this.canvas)
+        let pd = new PointerDrag(this.canvas)
+        pd.onMove(delta => {
+          if (pl.isLocked()) {
+            this.moveTop = -delta.y
+            this.moveRight = delta.x
+          }
+        })
+      }
+    }
+
+   
+    addMan()
+
+    /**
+     * Add Keys
+     */
+    this.keys = {
+      w: { isDown: false },
+      a: { isDown: false },
+      s: { isDown: false },
+      d: { isDown: false },
+      space: { isDown: false }
+    }
+
+    const press = (e, isDown) => {
+      e.preventDefault()
+      const { keyCode } = e
+      switch (keyCode) {
+        case 87: // w
+          this.keys.w.isDown = isDown
+          break
+        case 38: // arrow up
+          this.keys.w.isDown = isDown
+          break
+        case 32: // space
+          this.keys.space.isDown = isDown
+          break
+      }
+    }
+
+    document.addEventListener('keydown', e => press(e, true))
+    document.addEventListener('keyup', e => press(e, false))
+
+    /**
+     * Add joystick
+     */
+    if (isTouchDevice) {
+      const joystick = new JoyStick()
+      const axis = joystick.add.axis({
+        styles: { left: 20, bottom: 175, size: 100 }
+      })
+      axis.onMove(event => {
+        /**
+         * Update Camera
+         */
+        const { top, right } = event
+        this.moveTop = top * 3
+        this.moveRight = right * 3
+      })
+      const buttonA = joystick.add.button({
+        letter: 'A',
+        styles: { right: 20, bottom: 250, size: 80 }
+      })
+      buttonA.onClick(() => this.jump())
+      const buttonB = joystick.add.button({
+        letter: 'B',
+        styles: { right: 95, bottom: 175, size: 80 }
+      })
+      buttonB.onClick(() => (this.move = true))
+      buttonB.onRelease(() => (this.move = false))
+    }
+
+    setTimeout(() => {
+      const placeholder = document.getElementById('welcome-game-placeholder')
+      if (placeholder) placeholder.remove()
+    }, 500)
+  }
+
+
+
+
+
+
+  jump() {
+    if (!this.man || !this.canJump) return
+    this.canJump = false
+    this.man.animation.play('jump_running', 500, false)
+    setTimeout(() => {
+      this.canJump = true
+      this.man.animation.play('idle', 500)
+    }, 500)
+    this.man.body.applyForceY(6)
+  }
+
+  update(time, delta) {
+    if (this.man && this.man.body) {
+      /**
+       * Update Controls
+       */
+      this.controls.update(this.moveRight * 3, -this.moveTop * 3)
+      if (!isTouchDevice) this.moveRight = this.moveTop = 0
+      /**
+       * Player Turn
+       */
+      const speed = 4
+      const v3 = new THREE.Vector3()
+
+      const rotation = this.camera.getWorldDirection(v3)
+      const theta = Math.atan2(rotation.x, rotation.z)
+      const rotationMan = this.man.getWorldDirection(v3)
+      const thetaMan = Math.atan2(rotationMan.x, rotationMan.z)
+      this.man.body.setAngularVelocityY(0)
+
+      const l = Math.abs(theta - thetaMan)
+      let rotationSpeed = isTouchDevice ? 2 : 4
+      let d = Math.PI / 24
+
+      if (l > d) {
+        if (l > Math.PI - d) rotationSpeed *= -1
+        if (theta < thetaMan) rotationSpeed *= -1
+        this.man.body.setAngularVelocityY(rotationSpeed)
+      }
+
+      /**
+       * Player Move
+       */
+      if (this.keys.w.isDown || this.move) {
+        if (this.man.animation.current === 'idle' && this.canJump) this.man.animation.play('run')
+
+        const x = Math.sin(theta) * speed,
+          y = this.man.body.velocity.y,
+          z = Math.cos(theta) * speed
+
+        this.man.body.setVelocity(x, y, z)
+      } else {
+        if (this.man.animation.current === 'run' && this.canJump) this.man.animation.play('idle')
+      }
+
+      /**
+       * Player Jump
+       */
+      if (this.keys.space.isDown && this.canJump) {
+        this.jump()
+      }
+    }
+  }
+}
+
+window.addEventListener('load', () => {
+  PhysicsLoader('./enabled/lib/ammo/moz', () => {
+    const project = new Project({ antialias: true, maxSubSteps: 10, fixedTimeStep: 1 / 120, scenes: [MainScene] })
+
+    const destination = document.getElementById('welcome-game')
+    destination.appendChild(project.canvas)
+
+    project.canvas.style.marginTop = '0px !important'
+
+    const resize = () => {
+      const newWidth = window.innerWidth
+      const newHeight = (HEIGHT / WIDTH) * newWidth
+
+      destination.style.width = `${newWidth}px`
+      destination.style.height = `${newHeight}px`
+
+      project.renderer.setSize(newWidth, newHeight)
+      project.camera.aspect = newWidth / newHeight
+      project.camera.updateProjectionMatrix()
+    }
+
+    window.onresize = resize
+    resize()
+  })
+})
+
+	
+	
+	
+	</script>
+  </body>
+</html>
