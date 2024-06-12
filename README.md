@@ -1,4 +1,4 @@
-# b2w
+# B2W
 blender to web addon
 
 # Blender to Web (B2W) Addon
