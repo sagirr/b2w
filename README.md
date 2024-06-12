@@ -17,7 +17,7 @@ Blender to Web (B2W) addon is designed to help you easily export your 3D models 
 Follow these steps to install the Blender to Web (B2W) addon in Blender:
 
 1. **Download the Addon**
-   - Download the addon ZIP file from the [releases section](https://github.com/sagirr/b2w/releases) of this repository.
+   - Download the addon ZIP file from the [[releases section](https://github.com/sagirr/b2w/releases)](https://github.com/sagirr/b2w.git) of this repository.
 
 2. **Install the Addon in Blender**
    - Open Blender.
